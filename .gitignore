@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Datasets, checkpoints, artifacts
+data/
+datasets/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+runs/
+wandb/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+CLAUDE.md
