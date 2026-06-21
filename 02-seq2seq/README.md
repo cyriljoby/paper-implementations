@@ -78,10 +78,21 @@ Three key design choices beyond the basic encoder-decoder structure:
   but avoids committing to a bad path early.
     - Beam size 1 (greedy) also performed well.
 
-## My Architecture and Training Details
-Once I decide my architecture, dataset and scale I will update this section. From the above 
-training details it is clear that the same scale is impossible as Google operated with an 8 GPU 
-Machine over 10 days.
+
+## Planned Architecture and Training Details
+From the above training details it is clear that the same scale is impossible as Google operated with an 8 GPU Machine over 10 days. Therefore my dataset and training specs are listed below with full justifications for each choice:
+
+- **Dataset:** [Multi30k](https://github.com/multi30k/dataset) German→English with ~29k training pairs. Same task (translation), but can train in minutes on a single GPU.
+- **Model:** 2 layers, 256 hidden units, 256-dim embeddings. Smaller dataset thus using a smaller model to prevent overfitting.
+- **Vocabulary:** built from training data every word that appears at least twice, rare words replaced with `<unk>`. 
+- **Optimizer:** Adam with lr=3e-4. Converges faster than SGD and doesn't require manual learning rate schedule.
+- **Gradient clipping:** norm clipped at 5, same as the paper, as LSTM gradients can still explode.
+- **Training:** ~20-30 epochs with early stopping on validation loss. Can train for more epochs as less costly given scale of dataset.
+- **Decoding:** greedy (beam size 1). The paper found greedy performed surprisingly well, so beam search(size 2) is more of a stretch goal.
+- **Teacher forcing:** ratio of 1.0 (always ground truth) to match the paper. Will compare against 0.5 and 0.0 as well to determine how much exposure to its own predictions during training improves or worsens the model's robustness.
+- **Source reversal:** configurable flag to reproduce my own before/after BLEU comparison to validate one of the paper's key findings.
+- **Batching:** sorted by similar sentence length to minimize padding waste as mentioned in the paper.
+- **Evaluation:** BLEU score on test set.
 
 ## My Results
 Coming Soon
