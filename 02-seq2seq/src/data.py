@@ -2,11 +2,11 @@
 
 Pipeline order (each stage's output feeds the next):
     raw .de/.en files
-      -> read_parallel   list of (src_str, tgt_str) pairs
-      -> tokenize        list of (src_tokens, tgt_tokens)
-      -> Vocab.build     stoi / itos
-      -> Seq2SeqDataset  (src_ids, tgt_ids) per item
-      -> collate_fn      padded (batch, seq_len) tensors
+    - read_parallel() files -> (src_str, tgt_str) pairs
+    - tokenize()      strings -> (src_tokens, tgt_tokens) pairs
+    - Vocab.build()   tokens -> stoi/itos mappings
+    - Seq2SeqDataset  tokens + vocab -> (src_ids, tgt_ids) pairs
+    - collate()       id lists -> rectangular src/tgt tensors
 """
 
 from __future__ import annotations
@@ -15,8 +15,10 @@ from pathlib import Path
 import re
 import json
 from sys import path
-
-
+from torch import Tensor
+import torch
+from torch.utils.data import Dataset
+PAD_ID, SOS_ID, EOS_ID, UNK_ID = 0, 1, 2, 3
 def read_parallel(src_path: Path, tgt_path: Path) -> list[tuple[str, str]]:
     """Read a line-aligned parallel corpus into (source, target) string pairs.
 
@@ -61,7 +63,7 @@ class Vocab:
             min_freq: Minimum frequency for a token to be included in the vocabulary.
         """
         # string to index mapping used for encoding tokens to integers
-        self.stoi = {"<pad>": 0, "<sos>": 1, "<eos>": 2, "<unk>": 3}  # start with special tokens
+        self.stoi = {"<pad>": PAD_ID, "<sos>": SOS_ID, "<eos>": EOS_ID, "<unk>": UNK_ID}  # start with special tokens
         # index-to-string mapping: the list position IS the token's id, so itos[id] -> token. Used to decode ids back to tokens.
         self.itos = ["<pad>", "<sos>", "<eos>", "<unk>"]  # start with special tokens
         self.build(tokens, min_freq)
@@ -108,4 +110,33 @@ class Vocab:
         vocab.itos = itos
         vocab.stoi = {token: i for i, token in enumerate(itos)}
         return vocab
+
+# Implemented as a subclass of torch.utils.data.Dataset, which is the base class for all PyTorch datasets.
+# It requires implementing __len__ and __getitem__ methods. This allows PyTorch's DataLoader to efficiently load and batch data during training.
+class Seq2SeqDataset(Dataset):
+    def __init__(self, pairs: list[tuple[list[str], list[str]]], src_vocab: Vocab, tgt_vocab: Vocab) -> None:
+        """Create a dataset of (source_ids, target_ids) pairs from tokenized sentences."""
+        self.data = [
+            (src_vocab.encode(src_tokens), tgt_vocab.encode(tgt_tokens))
+            for src_tokens, tgt_tokens in pairs
+        ]
+    def __getitem__(self, i: int) -> tuple[list[int], list[int]]:
+        return self.data[i]
+    def __len__(self) -> int:
+        return len(self.data)
     
+def collate(batch: list[tuple[list[int], list[int]]], reverse: bool = False) -> tuple[Tensor, Tensor]:
+    """ Returns two tensors, one for src and other for tgt, each padded so they are rectangular."""
+    # Unzip the batch into separate lists
+    src_batch, tgt_batch = zip(*batch)
+    def shape(seqs: list[list[int]], do_reverse: bool) -> Tensor:
+        out = []
+        for sentence in seqs:
+            core = sentence[::-1] if do_reverse else sentence  # [::-1] makes a copy; .reverse() would mutate the dataset
+            out.append([SOS_ID] + core + [EOS_ID])  # Add <sos> and <eos> tokens
+        # find the length of the longest sentence
+        max_len = max(len(s) for s in out)
+        return torch.tensor([s + [PAD_ID] * (max_len - len(s)) for s in out], dtype=torch.long)  # Pad every sentence up to that length to form a rectangular tensor
+    src = shape(src_batch, reverse)
+    tgt = shape(tgt_batch, False)
+    return src, tgt
