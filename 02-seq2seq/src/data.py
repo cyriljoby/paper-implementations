@@ -18,7 +18,8 @@ from sys import path
 from torch import Tensor
 import torch
 from torch.utils.data import Dataset
-PAD_ID, SOS_ID, EOS_ID, UNK_ID = 0, 1, 2, 3
+
+from constants import PAD_ID, SOS_ID, EOS_ID, UNK_ID
 def read_parallel(src_path: Path, tgt_path: Path) -> list[tuple[str, str]]:
     """Read a line-aligned parallel corpus into (source, target) string pairs.
 
