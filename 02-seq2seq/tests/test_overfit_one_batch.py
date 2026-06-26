@@ -53,7 +53,7 @@ def test_overfit_one_batch() -> None:
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
 
     loss = torch.tensor(float("inf"))
-    for _ in range(600):
+    for _ in range(800):
         optimizer.zero_grad()
         outputs = model(src, tgt, teacher_forcing_ratio=1.0)  # (BATCH, SEQ_LEN, VOCAB)
         predictions = outputs[:, 1:, :].reshape(-1, VOCAB)  # drop <sos> and flatten

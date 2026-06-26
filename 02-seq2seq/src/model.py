@@ -10,6 +10,7 @@ from __future__ import annotations
 import torch.nn as nn
 from torch import Tensor
 import torch
+import random
 
 from constants import PAD_ID
 
@@ -111,6 +112,7 @@ class Seq2Seq(nn.Module):
         for time_step in range(1, seq_len):
             logits, hidden, cell = self.decoder(input_token, hidden, cell)
             outputs[:, time_step] = logits
-            # teacher forcing for now
-            input_token = tgt[:, time_step]
+            # next input: ground truth (teacher forcing) or the model's own top prediction
+            teacher_force = random.random() < teacher_forcing_ratio
+            input_token = tgt[:, time_step] if teacher_force else logits.argmax(1)
         return outputs
